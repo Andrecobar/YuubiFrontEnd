@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { View, ScrollView, ActivityIndicator, StyleSheet, StatusBar } from "react-native";
 import TopBar from "../components/UI/TopBar";
-import { HeaderCard } from "../components/Header/HeaderCard";
+import HeaderCard from "../components/Header/HeaderCard";
 import Carousel from "../components/UI/Carousel";
 import SmallCard from "../components/UI/SmallCard";
 import { fetchHome } from "../services/homeService";
@@ -26,6 +26,8 @@ export default function HomeScreen({ navigation }) {
 
       // Si no hay imagen o título, pon valores por defecto
       home.featured = {
+        tmdb_id: home.featured?.tmdb_id || home.featured?.id, // ⬅️ ¡IMPORTANTE!
+        type: home.featured?.type || "movie", // ⬅️ ¡IMPORTANTE!
         title: home.featured?.title || "Película destacada",
         backdrop: home.featured?.backdrop || home.featured?.poster || "https://placehold.co/600x800",
         genres: home.featured?.genres || ["Acción", "Drama"],

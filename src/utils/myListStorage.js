@@ -2,7 +2,19 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const PREFIX = "mylist_";
-const DEFAULT_USER = "default"; // cambia si implementas usuarios frontend
+const DEFAULT_USER = "default";
+
+// 🔔 Event emitter ligero (solo para sincronizar UI)
+const listeners = new Set();
+
+export const onMyListChange = (callback) => {
+  listeners.add(callback);
+  return () => listeners.delete(callback); // unsubscribe
+};
+
+const emitChange = () => {
+  listeners.forEach(cb => cb());
+};
 
 function keyFor(userId = DEFAULT_USER) {
   return `${PREFIX}${userId}`;
@@ -51,6 +63,10 @@ export async function addToMyList(item, userId = DEFAULT_USER, limit = 5) {
 
     list.push(normalized);
     await AsyncStorage.setItem(keyFor(userId), JSON.stringify(list));
+    
+    // 🔔 Notificar a todos los componentes interesados
+    emitChange();
+
     return list;
   } catch (e) {
     console.error("addToMyList error", e);
@@ -63,6 +79,10 @@ export async function removeFromMyList(tmdb_id, userId = DEFAULT_USER) {
     let list = await getMyList(userId);
     list = list.filter((i) => i.tmdb_id !== tmdb_id);
     await AsyncStorage.setItem(keyFor(userId), JSON.stringify(list));
+    
+    // 🔔 Notificar a todos los componentes interesados
+    emitChange();
+
     return list;
   } catch (e) {
     console.error("removeFromMyList error", e);

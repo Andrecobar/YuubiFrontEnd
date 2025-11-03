@@ -1,40 +1,99 @@
 // src/components/Header/HeaderCard.jsx
-import React from "react";
-import { View, StyleSheet, Text, Image, TouchableOpacity } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import { View, Text, TouchableOpacity, Image, StyleSheet, Animated } from "react-native";
+import {
+  addToMyList,
+  removeFromMyList,
+  isInMyList,
+  onMyListChange,
+} from "../../utils/myListStorage";
 
-export function HeaderCard({ details, onPlayPress, onMyListPress }) {
-  if (!details) return null;
+export default function HeaderCard({ details, onPlayPress }) {
+  const [inList, setInList] = useState(false);
+  const detailsRef = useRef(details);
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    detailsRef.current = details;
+  }, [details]);
+
+  const checkInListStatus = useCallback(async () => {
+    const id = detailsRef.current?.tmdb_id ?? detailsRef.current?.id;
+    if (id == null) return;
+    const isPresent = await isInMyList(id);
+    setInList(isPresent);
+  }, []);
+
+  useEffect(() => {
+    checkInListStatus();
+    const unsubscribe = onMyListChange(checkInListStatus);
+    return () => unsubscribe();
+  }, [checkInListStatus]);
+
+  const animate = (toValue = 1.06) => {
+    Animated.sequence([
+      Animated.timing(scale, { toValue, duration: 120, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: 120, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const handleMyListPress = async () => {
+    const details = detailsRef.current;
+    if (!details) return;
+
+    const id = details.tmdb_id ?? details.id;
+    if (id == null) return;
+
+    try {
+      animate();
+      if (inList) {
+        await removeFromMyList(id);
+        setInList(false);
+      } else {
+        await addToMyList(details);
+        setInList(true);
+      }
+    } catch (e) {
+      console.error("Error al actualizar la lista", e);
+    }
+  };
 
   return (
     <View style={styles.card}>
-      {/* fondo */}
-      <Image source={{ uri: details.backdrop || details.poster }} style={styles.image} />
+      <Image
+        source={{ uri: details.backdrop }}
+        style={styles.image}
+        resizeMode="cover"
+      />
 
-      {/* overlay para hacer legible el texto */}
       <View style={styles.overlay} />
 
-      {/* info */}
       <View style={styles.info}>
-        <Text style={styles.title} numberOfLines={2}>
-          {details.title}
-        </Text>
-        <Text style={styles.categories} numberOfLines={1}>
-          {(details.genres || details.genresText)
-            ? (details.genres?.join(" • ") || details.genresText)
-            : ""}
+        <Text style={styles.title}>{details.title}</Text>
+        <Text style={styles.categories}>
+          {details.genres?.join(", ") || "Géneros no disponibles"}
         </Text>
 
         <View style={styles.buttonsContainer}>
-          <TouchableOpacity style={styles.playButton} onPress={onPlayPress} activeOpacity={0.85}>
-            <Ionicons name="play" size={22} color="#000" />
-            <Text style={styles.playButtonText}>Play</Text>
+          <TouchableOpacity onPress={onPlayPress} style={styles.playButton}>
+            <Text style={styles.playButtonText}>▶ Play</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.myListButton} onPress={onMyListPress} activeOpacity={0.85}>
-            <Ionicons name="add" size={20} color="#fff" />
-            <Text style={styles.myListText}>My List</Text>
-          </TouchableOpacity>
+          {/* ✨ Botón My List con animación y colores invertidos */}
+          <Animated.View style={{ transform: [{ scale }] }}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleMyListPress}
+              style={[
+                styles.myListButton,
+                inList ? styles.myListButtonActive : styles.myListButtonInactive,
+              ]}
+            >
+              <Text style={[styles.myListText, inList ? styles.myListTextActive : null]}>
+                {inList ? "✓ My List " : "+ My List"}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
         </View>
       </View>
     </View>
@@ -50,7 +109,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginTop: 20,
     backgroundColor: "#000",
-    boxShadow: "0 0 1px rgb(255, 255, 255)",
+    elevation: 2,
+    shadowColor: "#fff",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   image: {
     width: "100%",
@@ -100,18 +163,35 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 18,
   },
+  // ✅ Estilos del botón My List — MANTIENE FORMA CUADRADA
   myListButton: {
     flexDirection: "row",
     alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 8, // cuadrado con bordes suaves, como antes
+  },
+  myListButtonInactive: {
+    flexDirection: "row",
     backgroundColor: "#333",
+    alignItems: "center",
     paddingVertical: 14,
     paddingHorizontal: 28,
     borderRadius: 8,
+  },
+  myListButtonActive: {
+    backgroundColor: "#fff",
   },
   myListText: {
     marginLeft: 8,
     color: "#fff",
     fontWeight: "700",
     fontSize: 18,
+  },
+  myListTextActive: {
+    color: "#000",
+  },
+  myListTextInactive: {
+    color: "#fff",
   },
 });
